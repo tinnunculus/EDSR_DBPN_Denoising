@@ -30,6 +30,12 @@ ed = EDSR_MODEL(pretrain = True)
 ed.pred("image_name")
 ```
 
+## Result
+
+![image](https://user-images.githubusercontent.com/36150943/68541316-582b9e80-03e1-11ea-91c2-d56decb4d597.png)
+
+
+
 ## Dependencies
 * python 3.6
 * keras
