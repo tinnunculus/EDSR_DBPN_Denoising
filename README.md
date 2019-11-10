@@ -36,7 +36,9 @@ ed.pred("image_name")
 
 ![image](https://user-images.githubusercontent.com/36150943/68541351-9fb22a80-03e1-11ea-91de-683455ba93b1.png)
 
+![image](https://user-images.githubusercontent.com/36150943/68541422-a3927c80-03e2-11ea-9902-5728d6e29ee4.png)
 
+![image](https://user-images.githubusercontent.com/36150943/68541432-b73de300-03e2-11ea-823a-80755771f490.png)
 
 
 ## Dependencies
