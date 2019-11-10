@@ -1,5 +1,5 @@
 # EDSR
-* This page is projects for graduation from Hongik University in 2019. 
+* This page is a project for graduation from Hongik University in 2019. 
 * EDSR(Enhanced Deep Residual Networks for Single Image Super-Resolution) with keras
 
 ![image](https://user-images.githubusercontent.com/36150943/68541243-57463d00-03e0-11ea-81d7-29c0299ac610.png)
