@@ -27,7 +27,7 @@ After training model finished, then you can process SR to any LR images.(the LR 
 ```python
 from edsr_model import EDSR_MODEL
 ed = EDSR_MODEL(pretrain = True)
-ed.pred("image_name")
+ed.pred("image_file_name")
 ```
 
 ## Result
