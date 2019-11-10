@@ -2,6 +2,9 @@
 * 이것은 홍익대학교 졸업을 위한 프로젝트입니다.
 * EDSR(Enhanced Deep Residual Networks for Single Image Super-Resolution) with keras
 
+![image](https://user-images.githubusercontent.com/36150943/68541243-57463d00-03e0-11ea-81d7-29c0299ac610.png)
+
+
 
 ## Data preprocess 
 1. Dataset으로는 DIV2K를 사용하였다.(당신은 Dataset이라는 디렉토리에 DIV2k dataset을 저장해야만 한다.)
