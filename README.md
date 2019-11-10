@@ -22,7 +22,7 @@ ed.train()
 ```
 
 ## Predict
-After training model finished, then you can process SR to any LR images.(the LR images you want to process have to be stored in the "test_image" directory
+After training model finished, then you can process SR to any LR images.(the LR images you want to process had to be stored in the "test_image" directory
 
 ```python
 from edsr_model import EDSR_MODEL
