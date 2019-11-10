@@ -39,5 +39,5 @@ ed.pred("image_name")
 * skimage
 
 ## Reference
-1. B Lim et al. Enhanced Deep Residual Networks for Single Image Super-Resolution. CVPR 2018
+1. B Lim et al. [Enhanced Deep Residual Networks for Single Image Super-Resolution.](https://arxiv.org/abs/1707.02921) CVPR 2018
 2. Keras Subpixel (Pixel-Shuffle layer) from: [Keras-Subpixel](https://github.com/atriumlts/subpixel/blob/master/keras_subpixel.py)
