@@ -1,5 +1,5 @@
 # EDSR
-* 이것은 홍익대학교 졸업을 위한 프로젝트입니다.
+* This page is projects for graduation from Hongik University in 2019. 
 * EDSR(Enhanced Deep Residual Networks for Single Image Super-Resolution) with keras
 
 ![image](https://user-images.githubusercontent.com/36150943/68541243-57463d00-03e0-11ea-81d7-29c0299ac610.png)
@@ -7,9 +7,9 @@
 
 
 ## Data preprocess 
-1. Dataset으로는 DIV2K를 사용하였다.(당신은 Dataset이라는 디렉토리에 DIV2k dataset을 저장해야만 한다.)
-2. Test image 800, validation image 100
-3. Opencv를 이용하여 모든 이미지를 50 x 50으로 분리하여 numpy 파일로 저장하였다.(proceseed이라는 디렉토리를 만들어 저장해야만한다.)
+1. The Datasets are DIV2K(you have to store the datasets in the "dataset" directory)
+2. Test images 800, validation images 100
+3. By using opencv libraries, the DIV2k Images are separated from 2k to patch(50x50), and the patchs are stored in the "processed" directory.
 4. 총 49110개의 test patch image와 6250개의 validation patch image가 나온다.
 
 ## Train
