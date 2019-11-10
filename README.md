@@ -10,10 +10,10 @@
 * The Datasets are DIV2K(you have to store the datasets in the "dataset" directory)
 * Test images 800, validation images 100
 * By using opencv libraries, the DIV2k Images are separated from 2k to patch(50x50), and the patchs are stored in the "processed" directory.
-* totally test patch images 49110 validation patch images 6250
+* Totally test patch images 49110 validation patch images 6250
 
 ## Train
-after data preprocess finished, then you can train the model by using 'train' method, and the trained model stored the "models" directory as '.h5' file format.
+After data preprocess finished, then you can train the model by using 'train' method, and the trained model stored the "models" directory as '.h5' file format.
 
 ```python
 from edsr_model import EDSR_MODEL
@@ -22,7 +22,7 @@ ed.train()
 ```
 
 ## Predict
-after training model finished, then you can process SR to any LR images.(the LR images you want to process have to be stored in the "test_image" directory
+After training model finished, then you can process SR to any LR images.(the LR images you want to process have to be stored in the "test_image" directory
 
 ```python
 from edsr_model import EDSR_MODEL
