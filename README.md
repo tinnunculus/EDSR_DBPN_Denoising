@@ -1,4 +1,4 @@
-# EDSR
+# EDSR with keras
 * This page is a project for graduation from Hongik University in 2019. 
 * EDSR(Enhanced Deep Residual Networks for Single Image Super-Resolution) with keras
 
