@@ -16,8 +16,8 @@
 After data preprocess finished, then you can train the model by using 'train' method, and the trained model stored the "models" directory as '.h5' file format.
 
 ```python
-from edsr_model import EDSR_MODEL
-ed = EDSR_MODEL()
+from edsr_keras import EDSR_KERAS
+ed = EDSR_KERAS()
 ed.train()
 ```
 
@@ -25,8 +25,8 @@ ed.train()
 After training model finished, then you can process SR to any LR images.(the LR images you want to process had to be stored in the "test_image" directory
 
 ```python
-from edsr_model import EDSR_MODEL
-ed = EDSR_MODEL(pretrain = True)
+from edsr_keras import EDSR_KERAS
+ed = EDSR_KERAS(pretrain = True)
 ed.pred("image_file_name")
 ```
 
