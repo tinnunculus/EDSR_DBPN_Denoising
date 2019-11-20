@@ -2,7 +2,7 @@ import os, cv2, glob
 import numpy as np
 
 class PREPROCESS(object):
-    def __init__(self, base_path, target_base_path):
+    def __init__(self, base_path = "dataset", target_base_path = "processed"):
         self.base_path = base_path
         self.target_base_path = target_base_path
 

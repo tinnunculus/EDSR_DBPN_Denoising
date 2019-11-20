@@ -3,8 +3,8 @@ import numpy as np
 import os, glob, time, cv2
 import matplotlib.pyplot as plt
 
-n_train = 48990
-n_val = 6000
+n_train = 49110
+n_val = 6250
 
 
 class EDSR_TENSORFLOW(object):
