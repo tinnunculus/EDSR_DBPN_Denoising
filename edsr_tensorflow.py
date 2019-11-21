@@ -200,7 +200,16 @@ class EDSR_TENSORFLOW(object):
 
         self.pred = output
         self.loss = tf.reduce_mean(tf.abs(self.label_images - self.pred))
+        self.psnr = tf.image.psnr(self.label_images, self.pred, max_val=1)
         self.saver = tf.train.Saver()
+        total_parameters = 0
+        for variable in tf.trainable_variables():
+            local_parameters = 1
+            shape = variable.get_shape()  # getting shape of a variable
+            for i in shape:
+                local_parameters *= i.value  # mutiplying dimension values
+            total_parameters += local_parameters
+        print(total_parameters)
 
 
     def train(self):
@@ -332,3 +341,24 @@ class EDSR_TENSORFLOW(object):
             return True
         else:
             return False
+
+    def _psnr(self):
+
+        base_path = "processed"
+        valid_HR_file_list = sorted(glob.glob(os.path.join(base_path, 'y_val', '*.npy')))
+        valid_LR_file_list = sorted(glob.glob(os.path.join(base_path, 'x_val', '*.npy')))
+
+        psnr = 0.0
+        for i in range(n_val):
+
+            batch_image = np.zeros((1, self.input_size, self.input_size, 3))
+            batch_label = np.zeros((1, self.label_size, self.label_size, 3))
+            batch_image[0] = np.load(valid_LR_file_list[i])
+            batch_label[0] = np.load(valid_HR_file_list[i])
+
+            temp = self.sess.run(self.psnr, feed_dict={self.input_images: batch_image, self.label_images: batch_label})
+            psnr += temp
+
+        psnr /= n_val
+
+        return psnr
