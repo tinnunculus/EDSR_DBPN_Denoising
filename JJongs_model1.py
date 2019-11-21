@@ -214,6 +214,7 @@ class JJONGS_MODEL(object):
         self.saver = tf.train.Saver()
         total_parameters = 0
         # iterating over all variables
+
         for variable in tf.trainable_variables():
             local_parameters = 1
             shape = variable.get_shape()  # getting shape of a variable
