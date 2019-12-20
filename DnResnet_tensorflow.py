@@ -3,39 +3,35 @@ import numpy as np
 import os, glob, time, cv2
 import matplotlib.pyplot as plt
 
-n_train = 27958
-n_val = 3598
-#n_train = 49110
-#n_val = 6250
+n_train = 49110
+n_val = 6250
 
-class EDSR_TENSORFLOW(object):
-    def __init__(self, sess, input_size = 50, label_size = 200, batch_size = 16, pretrain = False, scale = 4, epoch = 20,  checkpoint_dir = "edsr_tensorflow_checkpoint") :
+
+class DNRESNET_TENSORFLOW(object):
+    def __init__(self, sess, input_size = 50, batch_size = 16, pretrain = False, epoch = 35,  checkpoint_dir = "dnresnet_tensorflow_checkpoint") :
 
         self.sess = sess
         self.input_size = input_size
-        self.label_size = label_size
+        self.label_size = input_size
         self.batch_size = batch_size
         self.pretrain = pretrain
-        self.scale = scale
         self.epoch = epoch
         self.checkpoint_dir = checkpoint_dir
 
         self.build_model()
 
-    def residual_block(self,x,weight1,weight2,bias1,bias2):
+    def dn_residual_block(self,x,weight1,weight2,bias1,bias2):
         y = tf.nn.conv2d(x, weight1, strides = [1,1,1,1], padding ='SAME') + bias1
+        y = tf.compat.v1.layers.batch_normalization(y)
         y = tf.nn.relu(y)
         y = tf.nn.conv2d(y, weight2, strides = [1,1,1,1], padding = 'SAME') + bias2
+        y = tf.compat.v1.layers.batch_normalization(y)
         y = y * 0.1
         return x + y
 
-    def shuffle_operator(self, X, r):
-        temp = tf.depth_to_space(X, r)
-        return temp
-
     def build_model(self):
         self.input_images = tf.placeholder(tf.float32, [None, self.input_size, self.input_size, 3], name = 'input_images')
-        self.label_images = tf.placeholder(tf.float32, [None, self.label_size, self.label_size, 3], name = 'output_images')
+        self.label_images = tf.placeholder(tf.float32, [None, self.input_size, self.input_size, 3], name = 'output_images')
 
         with tf.name_scope("parameters"):
             self.weights = {
@@ -104,8 +100,7 @@ class EDSR_TENSORFLOW(object):
             'res31_2_weight': tf.Variable(tf.random_normal([3, 3, 256, 256], stddev=1e-3), name='Res31_2_Weight'),
             'res32_1_weight': tf.Variable(tf.random_normal([3, 3, 256, 256], stddev=1e-3), name='Res32_1_Weight'),
             'res32_2_weight': tf.Variable(tf.random_normal([3, 3, 256, 256], stddev=1e-3), name='Res32_2_Weight'),
-            'out_conv_weight' : tf.Variable(tf.random_normal([3, 3, 256, 256], stddev=1e-3), name='Out_Conv_Weight'),
-            'shuffle_weight' : tf.Variable(tf.random_normal([3, 3, 256, 3 * self.scale * self.scale], stddev=1e-3), name='Shuffle_Weight')
+            'out_conv_weight' : tf.Variable(tf.random_normal([3, 3, 256, 3], stddev=1e-3), name='Out_Conv_Weight')
         }
             self.biases = {
             'init_conv_bias': tf.Variable(tf.random_normal([256], stddev=1e-3), name='Init_Conv_Bias'),
@@ -173,8 +168,7 @@ class EDSR_TENSORFLOW(object):
             'res31_2_bias': tf.Variable(tf.random_normal([256], stddev=1e-3), name='Res31_2_Bias'),
             'res32_1_bias': tf.Variable(tf.random_normal([256], stddev=1e-3), name='Res32_1_Bias'),
             'res32_2_bias': tf.Variable(tf.random_normal([256], stddev=1e-3), name='Res32_2_Bias'),
-            'out_conv_bias': tf.Variable(tf.random_normal([256], stddev=1e-3), name='Out_Conv_Bias'),
-            'shuffle_bias': tf.Variable(tf.random_normal([3 * self.scale * self.scale], stddev=1e-3),name='Shuffle_Bias')
+            'out_conv_bias': tf.Variable(tf.random_normal([3], stddev=1e-3), name='Out_Conv_Bias'),
         }
 
         w_iter = iter(self.weights)
@@ -185,48 +179,46 @@ class EDSR_TENSORFLOW(object):
             initial_layer_act = tf.nn.relu(initial_layer_conv)
 
         with tf.name_scope("residual_layer"):
-            net = self.residual_block(initial_layer_act, self.weights[next(w_iter)], self.weights[next(w_iter)], self.biases[next(b_iter)], self.biases[next(b_iter)])
+            net = self.dn_residual_block(initial_layer_act, self.weights[next(w_iter)], self.weights[next(w_iter)], self.biases[next(b_iter)], self.biases[next(b_iter)])
             for i in range(31):
-                net = self.residual_block(net, self.weights[next(w_iter)], self.weights[next(w_iter)], self.biases[next(b_iter)], self.biases[next(b_iter)])
+                self.input_backproj = self.dn_residual_block(net, self.weights[next(w_iter)], self.weights[next(w_iter)], self.biases[next(b_iter)], self.biases[next(b_iter)])
 
         with tf.name_scope("finish_layer"):
-            finish_res_conv = tf.nn.conv2d(net,self.weights[next(w_iter)], strides = [1,1,1,1], padding = 'SAME') + self.biases[next(b_iter)]
-            finish_res_act = tf.nn.relu(finish_res_conv)
-            in_subpixel = initial_layer_act + finish_res_act
-
-        with tf.name_scope("upsample_layer"):
-            in_shuffle_conv = tf.nn.conv2d(in_subpixel,self.weights[next(w_iter)], strides = [1,1,1,1], padding = 'SAME') + self.biases[next(b_iter)]
-            in_shuffle_act = tf.nn.relu(in_shuffle_conv)
-            output = self.shuffle_operator(in_shuffle_act,self.scale)
+            finish_res_conv = tf.nn.conv2d(self.input_backproj,self.weights[next(w_iter)], strides = [1,1,1,1], padding = 'SAME') + self.biases[next(b_iter)]
+            output = self.input_images + finish_res_conv
 
         self.pred = output
-        self.input_backproj = in_subpixel
+        qwer = np.array([[0.0, -1.0, 0.0], [-1.0, 5.0, -1.0],[0.0, -1.0, 0.0]])
+        asdf = np.zeros((3,3,3,3))
+        for a in range(3):
+            for b in range(3):
+                asdf[a][b][0][0] = qwer[a][b]
+                asdf[a][b][1][1] = qwer[a][b]
+                asdf[a][b][2][2] = qwer[a][b]
+        sharpen_filter = tf.constant(asdf,dtype=tf.float32)
+        self.sharpen_image = tf.nn.conv2d(self.label_images, sharpen_filter, strides = [1,1,1,1], padding = 'SAME')
         self.loss = tf.reduce_mean(tf.abs(self.label_images - self.pred))
-        self.psnr = tf.image.psnr(self.label_images, self.pred, max_val=1)
         self.saver = tf.train.Saver()
-        total_parameters = 0
-        for variable in tf.trainable_variables():
-            local_parameters = 1
-            shape = variable.get_shape()  # getting shape of a variable
-            for i in shape:
-                local_parameters *= i.value  # mutiplying dimension values
-            total_parameters += local_parameters
-        print(total_parameters)
 
 
     def train(self):
 
         self.save_loss = np.zeros((self.epoch, 3))
 
-        base_path = 'processedx8'
-        train_HR_file_list = sorted(glob.glob(os.path.join(base_path, 'true_train', '*.npy')))
+        base_path = 'processed'
         train_LR_file_list = sorted(glob.glob(os.path.join(base_path, 'bicubic_train', '*.npy')))
-        valid_HR_file_list = sorted(glob.glob(os.path.join(base_path, 'true_val', '*.npy')))
+        train_LR_wild_w1_file_list = sorted(glob.glob(os.path.join(base_path, 'wild_w1_train', '*.npy')))
+        train_LR_wild_w2_file_list = sorted(glob.glob(os.path.join(base_path, 'wild_w2_train', '*.npy')))
+        train_LR_wild_w3_file_list = sorted(glob.glob(os.path.join(base_path, 'wild_w3_train', '*.npy')))
+        train_LR_wild_w4_file_list = sorted(glob.glob(os.path.join(base_path, 'wild_w4_train', '*.npy')))
+        train_LR_difficult_file_list = sorted(glob.glob(os.path.join(base_path, 'difficult_train', '*.npy')))
         valid_LR_file_list = sorted(glob.glob(os.path.join(base_path, 'bicubic_val', '*.npy')))
+        valid_LR_wild_file_list = sorted(glob.glob(os.path.join(base_path, 'wild_val', '*.npy')))
+        valid_LR_difficult_file_list = sorted(glob.glob(os.path.join(base_path, 'difficult_val', '*.npy')))
 
         global_step = tf.Variable(0, trainable=False)
         start_lr = 0.0001
-        decay_steps = 200000
+        decay_steps = 10000
         decay_rate = 0.5
         learning_rate = tf.compat.v1.train.natural_exp_decay(start_lr, global_step, decay_steps, decay_rate)
         self.train_op = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(loss = self.loss, global_step = global_step)
@@ -250,82 +242,93 @@ class EDSR_TENSORFLOW(object):
 
             for i in range(train_range) :
 
-                batch_image = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
-                batch_label = np.zeros((self.batch_size, self.label_size, self.label_size, 3))
-                for j in range(self.batch_size):
-                    batch_image[j] = np.load(train_LR_file_list[i * self.batch_size + j])
-                    batch_label[j] = np.load(train_HR_file_list[i * self.batch_size + j])
-
                 temp_time = time.time()
-                _, err = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image, self.label_images : batch_label})
-                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err))
-                counter += 1
+                batch_image = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
+                batch_label = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
 
-                sum_err += err
+
+                # wild1
+                for j in range(self.batch_size):
+                    batch_image[j] = np.load(train_LR_wild_w1_file_list[i * self.batch_size + j])
+                    batch_label[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+
+                self.temp_sharp = self.sess.run(self.sharpen_image, feed_dict = {self.label_images : batch_label})
+                self.temp_sharp[:,:,0,:] = batch_label[:,:,0,:]
+                self.temp_sharp[:,:,49,:] = batch_label[:,:,49,:]
+                self.temp_sharp[:,0,:,:] = batch_label[:,0,:,:]
+                self.temp_sharp[:,49,:,:] = batch_label[:,49,:,:]
+                _, err = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image, self.label_images : self.temp_sharp})
+
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err))
+
+                # wild2
+                for j in range(self.batch_size):
+                    batch_image[j] = np.load(train_LR_wild_w2_file_list[i * self.batch_size + j])
+                    batch_label[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+
+                self.temp_sharp = self.sess.run(self.sharpen_image, feed_dict={self.label_images: batch_label})
+                self.temp_sharp[:, :, 0, :] = batch_label[:, :, 0, :]
+                self.temp_sharp[:, :, 49, :] = batch_label[:, :, 49, :]
+                self.temp_sharp[:, 0, :, :] = batch_label[:, 0, :, :]
+                self.temp_sharp[:, 49, :, :] = batch_label[:, 49, :, :]
+                _, err = self.sess.run([self.train_op, self.loss],feed_dict={self.input_images: batch_image, self.label_images: self.temp_sharp})
+
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % (
+                (ep + 1), counter, time.time() - temp_time, err))
+
+                # wild3
+                for j in range(self.batch_size):
+                    batch_image[j] = np.load(train_LR_wild_w3_file_list[i * self.batch_size + j])
+                    batch_label[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+
+                self.temp_sharp = self.sess.run(self.sharpen_image, feed_dict={self.label_images: batch_label})
+                self.temp_sharp[:, :, 0, :] = batch_label[:, :, 0, :]
+                self.temp_sharp[:, :, 49, :] = batch_label[:, :, 49, :]
+                self.temp_sharp[:, 0, :, :] = batch_label[:, 0, :, :]
+                self.temp_sharp[:, 49, :, :] = batch_label[:, 49, :, :]
+                _, err = self.sess.run([self.train_op, self.loss],feed_dict={self.input_images: batch_image, self.label_images: self.temp_sharp})
+
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % (
+                (ep + 1), counter, time.time() - temp_time, err))
+
+                # wild4
+                for j in range(self.batch_size):
+                    batch_image[j] = np.load(train_LR_wild_w4_file_list[i * self.batch_size + j])
+                    batch_label[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+
+                self.temp_sharp = self.sess.run(self.sharpen_image, feed_dict={self.label_images: batch_label})
+                self.temp_sharp[:, :, 0, :] = batch_label[:, :, 0, :]
+                self.temp_sharp[:, :, 49, :] = batch_label[:, :, 49, :]
+                self.temp_sharp[:, 0, :, :] = batch_label[:, 0, :, :]
+                self.temp_sharp[:, 49, :, :] = batch_label[:, 49, :, :]
+                _, err = self.sess.run([self.train_op, self.loss],feed_dict={self.input_images: batch_image, self.label_images: self.temp_sharp})
+
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % (
+                (ep + 1), counter, time.time() - temp_time, err))
+
+
+                # difficult
+                for j in range(self.batch_size):
+                    batch_image[j] = np.load(train_LR_difficult_file_list[i * self.batch_size + j])
+                    batch_label[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+
+                self.temp_sharp = self.sess.run(self.sharpen_image, feed_dict={self.label_images: batch_label})
+                self.temp_sharp[:, :, 0, :] = batch_label[:, :, 0, :]
+                self.temp_sharp[:, :, 49, :] = batch_label[:, :, 49, :]
+                self.temp_sharp[:, 0, :, :] = batch_label[:, 0, :, :]
+                self.temp_sharp[:, 49, :, :] = batch_label[:, 49, :, :]
+                _, err = self.sess.run([self.train_op, self.loss],feed_dict={self.input_images: batch_image, self.label_images: self.temp_sharp})
+
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % (
+                (ep + 1), counter, time.time() - temp_time, err))
+
+                counter += 1
                 if counter % 500 == 0:
                     self.save(counter)
 
-            print("Epoch : [%2d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), time.time() - start_time, sum_err/train_range))
-
-            self.save_loss[ep][0] = sum_err / train_range
-            sum_err = 0
-            sum_psnr = 0
-            for i in range(val_range) :
-
-                batch_image = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
-                batch_label = np.zeros((self.batch_size, self.label_size, self.label_size, 3))
-                for j in range(self.batch_size):
-                    batch_image[j] = np.load(valid_LR_file_list[i * self.batch_size + j])
-                    batch_label[j] = np.load(valid_HR_file_list[i * self.batch_size + j])
-
-                err,qwer = self.sess.run([self.loss,self.psnr], feed_dict={self.input_images: batch_image, self.label_images: batch_label})
-                sum_err += err
-                sum_psnr +=qwer
-
-            print("Epoch [%2d] finished, validation loss : [%.8f], psnr :[%.8f]" % ((ep+1), sum_err/val_range, sum(sum_psnr/val_range)/self.batch_size))
-            self.save_loss[ep][1] = sum_err / val_range
-            self.save_loss[ep][2] = sum(sum_psnr/val_range)/self.batch_size
-
-        np.save(os.path.join("save_loss","edsr_tensorflow_" + str(self.epoch) + '.npy'), self.save_loss)
-
-
-
-
-
-    def predict(self,image_file,base_path = 'test_image'):
-
-        image_file = os.path.join(base_path, image_file)
-
-        input_image = cv2.cvtColor(cv2.imread(image_file),cv2.COLOR_BGR2RGB)
-        input_image = cv2.normalize(input_image.astype(np.float64), None, 0, 1, cv2.NORM_MINMAX)
-
-        h, w, _ = input_image.shape
-        h = (int)(h / self.input_size)
-        w = (int)(w / self.input_size)
-
-        pred_image = np.zeros((h * self.label_size, w * self.label_size, 3))
-
-        for j in range(h):
-            for k in range(w):
-                patch_image = input_image[j * self.input_size:(j + 1) * self.input_size, k * self.input_size:(k + 1) * self.input_size]
-                patch_image = patch_image.reshape((1, self.input_size, self.input_size, 3))
-                pred = self.sess.run(self.pred, feed_dict = {self.input_images : patch_image})
-                pred = np.clip(pred.reshape((self.label_size, self.label_size, 3)), 0, 1)
-                pred_image[j * self.label_size:(j + 1) * self.label_size, k * self.label_size:(k + 1) * self.label_size] = pred
-
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.title('input')
-        plt.imshow(input_image[:h * self.input_size, :w * self.input_size])
-        plt.subplot(1, 2, 2)
-        plt.title('pred')
-        plt.imshow(pred_image)
-        self.pred_image = pred_image
-
-
     def save(self,step) :
-        model_name = "edsr_tensorflow.model"
-        model_dir = "%s_%s" % ("edsr_tensorflow_scale_x", self.scale)
+        model_name = "dnresnet_wild_tensorflow.model"
+        model_dir = "dnresnet_wild_scale"
         checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
 
         if not os.path.exists(checkpoint_dir) :
@@ -336,7 +339,7 @@ class EDSR_TENSORFLOW(object):
 
     def load(self) :
         print(" [*] Reading checkpoints...")
-        model_dir = "%s_%s" % ("edsr_tensorflow_scale_x", self.scale)
+        model_dir = "dnresnet_wild_scale"
         checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
@@ -346,24 +349,3 @@ class EDSR_TENSORFLOW(object):
             return True
         else:
             return False
-
-    def _psnr(self):
-
-        _base_path = "processed"
-        _valid_HR_file_list = sorted(glob.glob(os.path.join(_base_path, 'y_val', '*.npy')))
-        _valid_LR_file_list = sorted(glob.glob(os.path.join(_base_path, 'x_val', '*.npy')))
-
-        psnr = 0.0
-        for i in range(n_val):
-
-            batch_image = np.zeros((1, self.input_size, self.input_size, 3))
-            batch_label = np.zeros((1, self.label_size, self.label_size, 3))
-            batch_image[0] = np.load(_valid_LR_file_list[i])
-            batch_label[0] = np.load(_valid_HR_file_list[i])
-
-            temp = self.sess.run(self.psnr, feed_dict={self.input_images: batch_image, self.label_images: batch_label})
-            psnr += temp
-
-        psnr /= n_val
-
-        return psnr

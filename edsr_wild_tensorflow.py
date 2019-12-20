@@ -8,7 +8,7 @@ n_val = 3598
 #n_train = 49110
 #n_val = 6250
 
-class EDSR_TENSORFLOW(object):
+class EDSR_WILD_TENSORFLOW(object):
     def __init__(self, sess, input_size = 50, label_size = 200, batch_size = 16, pretrain = False, scale = 4, epoch = 20,  checkpoint_dir = "edsr_tensorflow_checkpoint") :
 
         self.sess = sess
@@ -218,11 +218,13 @@ class EDSR_TENSORFLOW(object):
 
         self.save_loss = np.zeros((self.epoch, 3))
 
-        base_path = 'processedx8'
-        train_HR_file_list = sorted(glob.glob(os.path.join(base_path, 'true_train', '*.npy')))
-        train_LR_file_list = sorted(glob.glob(os.path.join(base_path, 'bicubic_train', '*.npy')))
-        valid_HR_file_list = sorted(glob.glob(os.path.join(base_path, 'true_val', '*.npy')))
-        valid_LR_file_list = sorted(glob.glob(os.path.join(base_path, 'bicubic_val', '*.npy')))
+        train_HR_file_list = sorted(glob.glob(os.path.join('processed', 'true_train', '*.npy')))
+        train_LR_w1_file_list = sorted(glob.glob(os.path.join('processed_train_wild_w1', '*.npy')))
+        train_LR_w2_file_list = sorted(glob.glob(os.path.join('processed_train_wild_w2', '*.npy')))
+        train_LR_w4_file_list = sorted(glob.glob(os.path.join('processed_train_wild_w4', '*.npy')))
+        train_LR_difficult_file_list = sorted(glob.glob(os.path.join('processed_train_difficult', '*.npy')))
+        valid_HR_file_list = sorted(glob.glob(os.path.join('processed', 'true_val', '*.npy')))
+        valid_LR_file_list = sorted(glob.glob(os.path.join('processed_valid_wild', '*.npy')))
 
         global_step = tf.Variable(0, trainable=False)
         start_lr = 0.0001
@@ -250,24 +252,36 @@ class EDSR_TENSORFLOW(object):
 
             for i in range(train_range) :
 
-                batch_image = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
+                batch_image_w1 = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
+                batch_image_w2 = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
+                batch_image_w4 = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
+                batch_image_d = np.zeros((self.batch_size, self.input_size, self.input_size, 3))
                 batch_label = np.zeros((self.batch_size, self.label_size, self.label_size, 3))
                 for j in range(self.batch_size):
-                    batch_image[j] = np.load(train_LR_file_list[i * self.batch_size + j])
+                    batch_image_w1[j] = np.load(train_LR_w1_file_list[i * self.batch_size + j])
+                    batch_image_w2[j] = np.load(train_LR_w2_file_list[i * self.batch_size + j])
+                    batch_image_w4[j] = np.load(train_LR_w4_file_list[i * self.batch_size + j])
+                    batch_image_d[j] = np.load(train_LR_difficult_file_list[i * self.batch_size + j])
                     batch_label[j] = np.load(train_HR_file_list[i * self.batch_size + j])
 
                 temp_time = time.time()
-                _, err = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image, self.label_images : batch_label})
-                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err))
+                _, err1 = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image_w1, self.label_images : batch_label})
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err1))
+                _, err2 = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image_w2, self.label_images : batch_label})
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err2))
+                _, err3 = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image_w4, self.label_images : batch_label})
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err3))
+                _, err4 = self.sess.run([self.train_op, self.loss], feed_dict = {self.input_images : batch_image_d, self.label_images : batch_label})
+                print("Epoch : [%2d], count : [%d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), counter, time.time() - temp_time, err4))
                 counter += 1
 
-                sum_err += err
+                sum_err = sum_err + err1 + err2 + err3 + err4
                 if counter % 500 == 0:
                     self.save(counter)
 
-            print("Epoch : [%2d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), time.time() - start_time, sum_err/train_range))
+            print("Epoch : [%2d], time : [%4.4f], train_loss : [%.8f]" % ((ep + 1), time.time() - start_time, sum_err/(train_range * 4)))
 
-            self.save_loss[ep][0] = sum_err / train_range
+            self.save_loss[ep][0] = sum_err / (train_range * 4)
             sum_err = 0
             sum_psnr = 0
             for i in range(val_range) :
@@ -325,7 +339,7 @@ class EDSR_TENSORFLOW(object):
 
     def save(self,step) :
         model_name = "edsr_tensorflow.model"
-        model_dir = "%s_%s" % ("edsr_tensorflow_scale_x", self.scale)
+        model_dir = "%s_%s" % ("edsr_tensorflow_wild_scale_x", self.scale)
         checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
 
         if not os.path.exists(checkpoint_dir) :
@@ -336,7 +350,7 @@ class EDSR_TENSORFLOW(object):
 
     def load(self) :
         print(" [*] Reading checkpoints...")
-        model_dir = "%s_%s" % ("edsr_tensorflow_scale_x", self.scale)
+        model_dir = "%s_%s" % ("edsr_tensorflow_wild_scale_x", self.scale)
         checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
