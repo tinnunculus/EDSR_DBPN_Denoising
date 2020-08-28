@@ -28,4 +28,4 @@
 
 ## Reference
 1. B Lim et al. [Enhanced Deep Residual Networks for Single Image Super-Resolution.](https://arxiv.org/abs/1707.02921) CVPR 2018
-3. DIV 2K image set from : [DIV_2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/)
+2. DIV 2K image set from : [DIV_2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/)
